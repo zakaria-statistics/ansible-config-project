@@ -1,0 +1,80 @@
+---
+# k8s_common: only what cloud-init did NOT already do
+
+- name: Sanity (show kernel + swap)
+  shell: |
+    set -e
+    lsmod | grep -q br_netfilter && echo "br_netfilter:ok" || echo "br_netfilter:missing"
+    grep -q ' swap ' /etc/fstab && echo "swap_in_fstab:true" || echo "swap_in_fstab:false"
+  register: sanity
+  changed_when: false
+
+- name: Print sanity info
+  debug:
+    var: sanity.stdout_lines
+
+# --- Kubernetes APT repo (v1.30 channel by default) ---
+- name: Install base deps for repo
+  apt:
+    name: [apt-transport-https, ca-certificates, curl, gnupg]
+    state: present
+    update_cache: true
+
+- name: Add Kubernetes apt key (once)
+  shell: |
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/{{ kube_version_apt_repo | default('v1.30') }}/deb/Release.key \
+      | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+- name: Add Kubernetes apt repo (once)
+  copy:
+    dest: /etc/apt/sources.list.d/kubernetes.list
+    content: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ kube_version_apt_repo | default('v1.30') }}/deb/ /"
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- Container runtime + kube tools ---
+- name: Install containerd & kube tools
+  apt:
+    name:
+      - containerd.io
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: present
+    update_cache: true
+
+- name: Ensure containerd config exists
+  shell: |
+    mkdir -p /etc/containerd
+    [ -s /etc/containerd/config.toml ] || containerd config default > /etc/containerd/config.toml
+  args:
+    creates: /etc/containerd/config.toml
+
+- name: Set SystemdCgroup=true for containerd
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: '^(\\s*)SystemdCgroup\\s*=\\s*false'
+    replace: '\\1SystemdCgroup = true'
+  notify: Restart containerd
+
+- name: Enable and start containerd
+  systemd:
+    name: containerd
+    enabled: true
+    state: started
+
+- name: Enable kubelet (API will come up after kubeadm init/join)
+  systemd:
+    name: kubelet
+    enabled: true
+    state: started
+
+# Optional: lock versions (uncomment if you want to pin)
+- name: Hold kube tools at current version
+  apt:
+    name: [kubelet, kubeadm, kubectl]
+    state: hold

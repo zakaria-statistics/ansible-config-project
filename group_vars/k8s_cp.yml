@@ -1,0 +1,1 @@
+kubernetes_version: "stable"              # kubeadm init --kubernetes-version

@@ -1,0 +1,4 @@
+- hosts: k8s_cp
+  become: true
+  roles:
+    - k8s_cp

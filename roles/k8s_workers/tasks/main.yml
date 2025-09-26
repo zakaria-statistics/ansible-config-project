@@ -1,0 +1,4 @@
+- name: Join worker to cluster
+  command: "{{ hostvars[groups['k8s_cp'][0]].k8s_join_command }} --v=5"
+  args:
+    creates: /etc/kubernetes/kubelet.conf

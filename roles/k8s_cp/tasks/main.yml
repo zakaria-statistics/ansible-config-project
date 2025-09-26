@@ -1,0 +1,33 @@
+- name: Write kubeadm config
+  copy:
+    dest: /root/kubeadm-config.yaml
+    content: |
+      apiVersion: kubeadm.k8s.io/v1beta4
+      kind: ClusterConfiguration
+      kubernetesVersion: {{ kubernetes_version }}
+      networking:
+        podSubnet: "{{ pod_cidr }}"
+
+- name: kubeadm init
+  command: kubeadm init --config=/root/kubeadm-config.yaml
+  args: { creates: /etc/kubernetes/admin.conf }
+
+- name: Setup admin kubeconfig
+  shell: |
+    mkdir -p /root/.kube
+    cp /etc/kubernetes/admin.conf /root/.kube/config
+    chown root:root /root/.kube/config
+  changed_when: false
+
+- name: Install Calico
+  environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+  command: kubectl apply -f {{ calico_manifest }}
+
+- name: Generate join command
+  command: kubeadm token create --print-join-command
+  register: join_cmd
+  changed_when: false
+
+- name: Save join command in hostvar (for next play)
+  set_fact:
+    k8s_join_command: "{{ join_cmd.stdout }}"

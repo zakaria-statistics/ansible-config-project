@@ -1,0 +1,3 @@
+kube_version_apt_repo: "v1.30"            # apt channel
+pod_cidr: "192.168.0.0/16"                # Calico default
+calico_manifest: "https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/calico.yaml"
