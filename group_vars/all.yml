@@ -1,3 +1,16 @@
-kube_version_apt_repo: "v1.30"            # apt channel
-pod_cidr: "192.168.0.0/16"                # Calico default
+# containerd: use Ubuntu package by default (simple). To use Docker's containerd.io, set "docker".
+containerd_source: "ubuntu"          # "ubuntu" | "docker"
+containerd_config_path: "/etc/containerd/config.toml"
+containerd_cgroup_systemd: true
+
+# Kubernetes repo channel & pinned package version
+kube_repo_channel: "v1.30"           # apt channel
+kube_pkg_version: "1.30.4-1.1"       # package pin (apt)
+kubeadm_kubernetes_version: "v1.30.4"
+
+# Networking
+pod_cidr: "192.168.0.0/16"           # Calico default
 calico_manifest: "https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/calico.yaml"
+
+# Optional: inject kubelet extra args (usually not needed)
+kubelet_extra_args: ""               # e.g. "--node-ip=10.20.3.4"

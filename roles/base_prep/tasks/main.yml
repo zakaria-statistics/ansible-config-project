@@ -1,0 +1,50 @@
+---
+# Keep this lean since your cloud-init already sets many bits.
+
+- name: Disable swap now (idempotent)
+  command: swapoff -a
+  changed_when: false
+
+- name: Comment out swap lines in fstab
+  replace:
+    path: /etc/fstab
+    regexp: '(^.*\s+swap\s+.*$)'
+    replace: '# \1'
+
+- name: Ensure kernel modules file exists
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+      ip_vs
+      ip_vs_rr
+      ip_vs_wrr
+      ip_vs_sh
+      nf_conntrack
+
+- name: Load required modules (best-effort)
+  shell: |
+    modprobe overlay || true
+    modprobe br_netfilter || true
+    modprobe ip_vs || true
+    modprobe ip_vs_rr || true
+    modprobe ip_vs_wrr || true
+    modprobe ip_vs_sh || true
+    modprobe nf_conntrack || true
+  changed_when: false
+
+- name: Sysctl for Kubernetes
+  copy:
+    dest: /etc/sysctl.d/99-k8s.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward = 1
+  notify: Apply sysctl
+
+- name: Base tools
+  apt:
+    name: [apt-transport-https, ca-certificates, curl, gnupg, jq, conntrack, socat, ebtables, ethtool, ipvsadm, ipset, nftables]
+    state: present
+    update_cache: true

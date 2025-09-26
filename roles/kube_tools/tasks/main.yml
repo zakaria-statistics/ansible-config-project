@@ -1,0 +1,42 @@
+---
+- name: Add Kubernetes apt key ({{ kube_repo_channel }})
+  shell: |
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/{{ kube_repo_channel }}/deb/Release.key \
+      | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+- name: Add Kubernetes apt repo ({{ kube_repo_channel }})
+  copy:
+    dest: /etc/apt/sources.list.d/kubernetes.list
+    content: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ kube_repo_channel }}/deb/ /"
+    mode: "0644"
+
+- name: Install kubelet/kubeadm/kubectl (pinned)
+  apt:
+    name:
+      - "kubelet={{ kube_pkg_version }}"
+      - "kubeadm={{ kube_pkg_version }}"
+      - "kubectl={{ kube_pkg_version }}"
+    state: present
+    update_cache: true
+
+- name: Hold kube tools
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: [kubelet, kubeadm, kubectl]
+
+- name: Optionally set kubelet extra args
+  when: kubelet_extra_args | length > 0
+  copy:
+    dest: /etc/default/kubelet
+    content: "KUBELET_EXTRA_ARGS={{ kubelet_extra_args }}\n"
+  notify: Restart kubelet
+
+- name: Enable & start kubelet
+  systemd:
+    name: kubelet
+    enabled: true
+    state: started

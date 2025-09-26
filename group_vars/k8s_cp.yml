@@ -1,1 +1,1 @@
-kubernetes_version: "stable"              # kubeadm init --kubernetes-version
+# (empty for now; here if you want CP-only vars later)

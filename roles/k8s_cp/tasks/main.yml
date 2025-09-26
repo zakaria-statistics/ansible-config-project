@@ -1,18 +1,24 @@
-- name: Write kubeadm config
+---
+- name: kubeadm config (CP)
   copy:
     dest: /root/kubeadm-config.yaml
     content: |
       apiVersion: kubeadm.k8s.io/v1beta4
       kind: ClusterConfiguration
-      kubernetesVersion: {{ kubernetes_version }}
+      kubernetesVersion: {{ kubeadm_kubernetes_version }}
       networking:
         podSubnet: "{{ pod_cidr }}"
+      ---
+      apiVersion: kubeadm.k8s.io/v1beta4
+      kind: InitConfiguration
+      nodeRegistration:
+        criSocket: "unix:///run/containerd/containerd.sock"
 
 - name: kubeadm init
   command: kubeadm init --config=/root/kubeadm-config.yaml
   args: { creates: /etc/kubernetes/admin.conf }
 
-- name: Setup admin kubeconfig
+- name: admin kubeconfig for root
   shell: |
     mkdir -p /root/.kube
     cp /etc/kubernetes/admin.conf /root/.kube/config
@@ -28,6 +34,6 @@
   register: join_cmd
   changed_when: false
 
-- name: Save join command in hostvar (for next play)
+- name: Save join command fact
   set_fact:
-    k8s_join_command: "{{ join_cmd.stdout }}"
+    join_cmd_fact: "{{ join_cmd.stdout }}"

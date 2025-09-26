@@ -40,7 +40,7 @@
 - name: Install containerd & kube tools
   apt:
     name:
-      - containerd.io
+      - containerd
       - kubelet
       - kubeadm
       - kubectl
