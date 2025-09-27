@@ -1,25 +1,4 @@
-- hosts: k8s_cp
-  become: true
-  gather_facts: false
-  tasks:
-    - name: Generate fresh join command
-      command: kubeadm token create --print-join-command
-      register: join_cmd
-      changed_when: false
-
-    - name: Share join command to all hosts
-      add_host:
-        name: "localhost"
-        groups: temp_controller
-        join_cmd: "{{ join_cmd.stdout | trim }}"
-
 - hosts: k8s_workers
   become: true
-  gather_facts: false
-  vars:
-    join_cmd: "{{ hostvars['localhost'].join_cmd }}"
-  tasks:
-    - name: Join worker if not already joined
-      command: "{{ join_cmd }} --v=5"
-      args:
-        creates: /etc/kubernetes/kubelet.conf
+  roles:
+    - k8s_worker

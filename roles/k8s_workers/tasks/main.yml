@@ -1,5 +1,5 @@
 ---
 - name: Join node to cluster
-  command: "{{ hostvars[groups['k8s_cp'][0]].join_cmd_fact }} --v=5"
+  command: "{{ hostvars[groups['k8s_cp'][0]].k8s_join_cmd }} --v=5"
   args:
     creates: /etc/kubernetes/kubelet.conf

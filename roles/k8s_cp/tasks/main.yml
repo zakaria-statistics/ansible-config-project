@@ -18,6 +18,17 @@
   command: kubeadm init --config=/root/kubeadm-config.yaml
   args: { creates: /etc/kubernetes/admin.conf }
 
+# Ensure API server is responsive
+- name: wait for API server to be responsive
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  command: kubectl get --raw=/healthz
+  register: api_health
+  retries: 30
+  delay: 4
+  until: api_health.rc == 0
+  changed_when: false
+
 - name: admin kubeconfig for root
   shell: |
     mkdir -p /root/.kube
@@ -25,6 +36,53 @@
     chown root:root /root/.kube/config
   changed_when: false
 
+# Cache kubeconfig for other plays
+- name: Read admin.conf from control plane
+  slurp:
+    src: /etc/kubernetes/admin.conf
+  register: kc
+
+- name: Cache kubeconfig fact (base64-decoded)
+  set_fact:
+    k8s_admin_kubeconfig: "{{ kc.content | b64decode }}"
+    cacheable: true
+
+# optional: write kubeconfig to bastion
+- name: Write kubeconfig to bastion
+  delegate_to: localhost
+  run_once: true
+  copy:
+    dest: /tmp/admin.conf
+    mode: "0600"
+    content: "{{ kc.content | b64decode }}"
+
+# Generate fresh join command (24h TTL)
+- name: Generate fresh join command
+  command: kubeadm token create --print-join-command --ttl 24h
+  register: join_cmd
+  changed_when: false
+
+# make join command available for other plays
+- name: Make join command available
+  set_fact:
+    k8s_join_command: "{{ join_cmd.stdout | trim }}"
+    cacheable: yes
+
+# optional: also drop it on the bastion as file
+- name: Write join command to bastion
+  delegate_to: localhost
+  run_once: true
+  copy:
+    dest: /tmp/k8s_join.sh
+    mode: "0700"
+    content: "{{ join_cmd.stdout | trim }}"
+
+# optional: Show join command
+- name: Show join command
+  debug:
+    msg: "{{ join_cmd.stdout | trim }}"
+
+# Install a CNI (Calico)
 - name: Install Calico
   environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
   command: kubectl apply -f {{ calico_manifest }}

@@ -1,0 +1,39 @@
+---
+- name: Add Kubernetes apt key ({{ kube_repo_channel | default('v1.30') }})
+  shell: |
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/{{ kube_repo_channel | default('v1.30') }}/deb/Release.key \
+      | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+- name: Add Kubernetes apt repo
+  copy:
+    dest: /etc/apt/sources.list.d/kubernetes.list
+    mode: "0644"
+    content: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ kube_repo_channel | default('v1.30') }}/deb/ /"
+
+- name: Install kubectl (pinned if set)
+  apt:
+    name: "{{ 'kubectl=' + kubectl_pkg_version if (kubectl_pkg_version | default('')) | length > 0 else 'kubectl' }}"
+    state: present
+    update_cache: true
+
+- name: Ensure ~/.kube exists
+  file:
+    path: "{{ kubeconfig_dest_dir | default(ansible_env.HOME + '/.kube') }}"
+    state: directory
+    mode: "0700"
+
+- name: Write kubeconfig from cached fact
+  copy:
+    dest: "{{ (kubeconfig_dest_dir | default(ansible_env.HOME + '/.kube')) + '/config' }}"
+    mode: "0600"
+    content: "{{ kubeconfig_content }}"
+
+- name: Enable kubectl bash completion
+  lineinfile:
+    path: "{{ ansible_env.HOME }}/.bashrc"
+    line: 'source <(kubectl completion bash)'
+    insertafter: EOF
+    state: present

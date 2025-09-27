@@ -1,0 +1,3 @@
+mkdir -p ~/ansible-config-project/fact_cache
+chmod 700 ~/ansible-config-project/fact_cache
+chown -R azureuser:azureuser ~/ansible-config-project/fact_cache
