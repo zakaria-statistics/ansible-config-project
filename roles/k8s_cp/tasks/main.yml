@@ -34,6 +34,10 @@
   register: join_cmd
   changed_when: false
 
-- name: Save join command fact
-  set_fact:
-    join_cmd_fact: "{{ join_cmd.stdout }}"
+- name: Write join command to bastion
+  delegate_to: localhost
+  run_once: true
+  copy:
+    dest: /tmp/k8s_join.sh
+    mode: "0700"
+    content: "{{ join_cmd.stdout | trim }}"
