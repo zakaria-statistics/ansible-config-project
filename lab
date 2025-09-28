@@ -1,3 +1,70 @@
 mkdir -p ~/ansible-config-project/fact_cache
 chmod 700 ~/ansible-config-project/fact_cache
 chown -R azureuser:azureuser ~/ansible-config-project/fact_cache
+
+ansible-playbook playbooks/00_prep.yml
+ansible-playbook playbooks/01_containerd.yml
+ansible-playbook playbooks/02_kube_tools.yml
+
+ansible-playbook playbooks/10_cp_init.yml
+ansible-playbook playbooks/11_workers_join.yml
+ansible-playbook playbooks/20_bastion_kubectl.yml
+
+ansible-playbook playbooks/90_export_kubeconfig.yml   # copy output into your vault
+
+
+
+ansible-playbook -i inventory.ini playbooks/20_bastion_kubectl.yml
+
+ansible k8s_cp,k8s_workers -m shell -o -a 'sudo cat /etc/kubernetes/admin.conf'
+
+
+# prep checks
+ansible k8s_cp,k8s_workers -m shell -o -a 'swapon --show || true'
+ansible k8s_cp,k8s_workers -m shell -o -a 'lsmod | egrep "br_netfilter|ip_vs" || true'
+ansible k8s_cp,k8s_workers -m shell -o -a 'sysctl net.ipv4.ip_forward; sysctl net.bridge.bridge-nf-call-iptables'
+
+# containerd checks
+ansible k8s_cp,k8s_workers -m shell -o -a 'systemctl is-enabled containerd; systemctl is-active containerd'
+ansible k8s_cp,k8s_workers -m shell -o -a 'ss -lx | grep containerd.sock || ls -l /run/containerd/containerd.sock'
+ansible k8s_cp,k8s_workers -m shell -o -a "awk -F= '/^[[:space:]]*SystemdCgroup/{gsub(/[[:space:]]/,\"\",\$2); print tolower(\$2)}' /etc/containerd/config.toml"
+ansible k8s_cp,k8s_workers -m shell -o -a 'containerd --version; runc --version'
+
+# kubeadm/kubelet/kubectl checks
+ansible k8s_cp,k8s_workers -m shell -o -a 'kubeadm version -o short || true'
+ansible k8s_cp,k8s_workers -m shell -o -a 'kubelet --version || true'
+ansible k8s_cp,k8s_workers -m shell -o -a 'kubectl version --client short || true'
+ansible k8s_cp,k8s_workers -m shell -o -a "dpkg --get-selections | egrep 'kube(adm|let|ctl).*hold' || true"
+
+
+# manifests created by kubeadm init
+ansible k8s_cp,k8s_workers -m shell -o -a 'ls -1 /etc/kubernetes/manifests'
+
+
+# kubelet status (expect active after init)
+ansible k8s_cp,k8s_workers -m shell -o -a 'systemctl is-enabled kubelet; systemctl is-active kubelet || true'
+
+# API reachable & core pods
+ansible k8s_cp,k8s_workers -m shell -o -a 'sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get nodes -o wide'
+ansible k8s_cp,k8s_workers -m shell -o -a 'sudo kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-system get pods -o wide'
+
+# if something’s off, grab kubelet logs
+ansible k8s_cp,k8s_workers -m shell -o -a 'journalctl -u kubelet --no-pager -n 120'
+
+
+ansible k8s_cp,k8s_workers -m shell -o -a 'sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get nodes -o wide'
+ansible k8s_cp,k8s_workers -m shell -o -a 'sudo kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-system get ds/calico-node -o wide'
+
+
+# Calico components
+ansible k8s_cp,k8s_workers -m shell -o -a 'sudo kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-system get pods -l k8s-app=calico-node -o wide'
+
+# kube-proxy present
+ansible k8s_cp,k8s_workers -m shell -o -a 'sudo kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-system get ds/kube-proxy -o wide'
+
+
+ansible k8s_cp,k8s_workers -m shell -o -a 'crictl ps -a | head'
+ansible k8s_cp,k8s_workers -m shell -o -a 'ctr -n k8s.io containers ls | head'
+ansible k8s_cp,k8s_workers -m shell -o -a 'ctr -n k8s.io tasks ls | head'
+
+

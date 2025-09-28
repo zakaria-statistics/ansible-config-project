@@ -1,5 +1,6 @@
 ---
 - name: Add Kubernetes apt key ({{ kube_repo_channel | default('v1.30') }})
+  become: true
   shell: |
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://pkgs.k8s.io/core:/stable:/{{ kube_repo_channel | default('v1.30') }}/deb/Release.key \
@@ -8,32 +9,43 @@
     creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
 - name: Add Kubernetes apt repo
+  become: true
   copy:
     dest: /etc/apt/sources.list.d/kubernetes.list
     mode: "0644"
     content: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ kube_repo_channel | default('v1.30') }}/deb/ /"
 
 - name: Install kubectl (pinned if set)
+  become: true
   apt:
     name: "{{ 'kubectl=' + kubectl_pkg_version if (kubectl_pkg_version | default('')) | length > 0 else 'kubectl' }}"
     state: present
     update_cache: true
 
-- name: Ensure ~/.kube exists
+- name: Compute kube home dir
+  become: false
+  set_fact:
+    kube_home: "{{ kubeconfig_dest_dir | default(lookup('env','HOME') + '/.kube') }}"
+
+- name: Ensure ~/.kube exists for bastion user
+  become_user: "{{ bastion_user }}"
   file:
-    path: "{{ kubeconfig_dest_dir | default(ansible_env.HOME + '/.kube') }}"
+    path: "/home/{{ bastion_user }}/.kube"
     state: directory
     mode: "0700"
 
 - name: Write kubeconfig from cached fact
+  become_user: "{{ bastion_user }}"
   copy:
-    dest: "{{ (kubeconfig_dest_dir | default(ansible_env.HOME + '/.kube')) + '/config' }}"
+    dest: "/home/{{ bastion_user }}/.kube/config"
     mode: "0600"
     content: "{{ kubeconfig_content }}"
 
-- name: Enable kubectl bash completion
+- name: Export KUBECONFIG in ~/.bashrc
+  become_user: "{{ bastion_user }}"
   lineinfile:
-    path: "{{ ansible_env.HOME }}/.bashrc"
-    line: 'source <(kubectl completion bash)'
+    path: "/home/{{ bastion_user }}/.bashrc"
+    line: 'export KUBECONFIG="$HOME/.kube/config"'
     insertafter: EOF
     state: present
+    create: yes

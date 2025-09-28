@@ -1,11 +1,12 @@
 ---
-- hosts: localhost
+- hosts: bastion_host
   gather_facts: false
   vars:
-    kube_repo_channel: "v1.30"          # pin channel if you like
-    kubectl_pkg_version: "1.30.4-1.1"   # or omit to get latest in that channel
+    bastion_user: "azureuser"
+    kube_repo_channel: "v1.30"
+    kubectl_pkg_version: "1.30.4-1.1"
     kubeconfig_content: "{{ hostvars[groups['k8s_cp'][0]].k8s_admin_kubeconfig }}"
-    kubeconfig_dest_dir: "{{ ansible_env.HOME + '/.kube' }}"
+    kube_home: "/home/{{ bastion_user }}/.kube"
   pre_tasks:
     - name: Assert kubeconfig is present in fact cache
       assert:
