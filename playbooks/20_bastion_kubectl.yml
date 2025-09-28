@@ -1,5 +1,5 @@
 ---
-- hosts: bastion_host
+- hosts: localhost
   gather_facts: false
   vars:
     bastion_user: "azureuser"

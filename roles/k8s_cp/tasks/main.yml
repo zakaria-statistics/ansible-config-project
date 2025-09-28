@@ -49,7 +49,7 @@
 
 # optional: write kubeconfig to bastion
 - name: Write kubeconfig to bastion
-  delegate_to: bastion_host
+  delegate_to: localhost
   run_once: true
   copy:
     dest: /tmp/admin.conf
@@ -70,7 +70,7 @@
 
 # optional: also drop it on the bastion as file
 - name: Write join command to bastion
-  delegate_to: bastion_host
+  delegate_to: localhost
   run_once: true
   copy:
     dest: /tmp/k8s_join.sh
