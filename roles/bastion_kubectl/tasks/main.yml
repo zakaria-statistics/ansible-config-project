@@ -28,21 +28,33 @@
     kube_home: "{{ kubeconfig_dest_dir | default(lookup('env','HOME') + '/.kube') }}"
 
 - name: Ensure ~/.kube exists for bastion user
-  become_user: "{{ bastion_user }}"
+  become: true
   file:
     path: "/home/{{ bastion_user }}/.kube"
     state: directory
+    owner: "{{ bastion_user }}"
+    group: "{{ bastion_user }}"
     mode: "0700"
 
 - name: Write kubeconfig from cached fact
-  become_user: "{{ bastion_user }}"
+  become: true
   copy:
     dest: "/home/{{ bastion_user }}/.kube/config"
+    owner: "{{ bastion_user }}"
+    group: "{{ bastion_user }}"
     mode: "0600"
     content: "{{ kubeconfig_content }}"
 
+- name: Install kubeconfig for root
+  become: true
+  copy:
+    src: "/home/{{ bastion_user }}/.kube/config"
+    dest: /root/.kube/config
+    mode: "0600"
+    
+# Make kubectl available automatically for interactive shells
 - name: Export KUBECONFIG in ~/.bashrc
-  become_user: "{{ bastion_user }}"
+  become: true
   lineinfile:
     path: "/home/{{ bastion_user }}/.bashrc"
     line: 'export KUBECONFIG="$HOME/.kube/config"'
