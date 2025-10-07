@@ -44,13 +44,6 @@
     group: "{{ bastion_user }}"
     mode: "0600"
     content: "{{ kubeconfig_content }}"
-
-- name: Install kubeconfig for root
-  become: true
-  copy:
-    src: "/home/{{ bastion_user }}/.kube/config"
-    dest: /root/.kube/config
-    mode: "0600"
     
 # Make kubectl available automatically for interactive shells
 - name: Export KUBECONFIG in ~/.bashrc
